@@ -143,9 +143,11 @@ impl Editor {
             }
             return None;
         } else if event.code == KeyCode::Backspace {
-            return Some(EditorMode::Command(
-                command[..command.len() - 1].to_string(),
-            ));
+            if !command.is_empty() {
+                return Some(EditorMode::Command(
+                    command[..command.len() - 1].to_string(),
+                ));
+            }
         } else if event.code == KeyCode::Enter {
             self.process_command(command.as_str());
             return Some(EditorMode::Command("".into()));
