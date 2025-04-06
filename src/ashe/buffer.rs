@@ -7,11 +7,8 @@ pub struct Buffer {
 }
 
 impl Buffer {
-    pub fn new(file: &Path) -> Result<Self, std::io::Error> {
-        Ok(Buffer {
-            data: std::fs::read(file)?,
-            dirty: false,
-        })
+    pub fn new(data: Vec<u8>) -> Self {
+        Buffer { data, dirty: false }
     }
 
     pub fn len(&self) -> usize {
@@ -23,7 +20,7 @@ impl Buffer {
         self.data[index] = data;
     }
 
-    pub fn save(&mut self, path: Box<Path>) -> Result<(), std::io::Error> {
+    pub fn save(&mut self, path: &Path) -> Result<(), std::io::Error> {
         match std::fs::write(path, &self.data) {
             Ok(_) => {
                 self.dirty = false;

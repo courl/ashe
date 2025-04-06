@@ -1,7 +1,6 @@
 mod ashe;
 
 use ashe::editor::Editor;
-use ashe::terminal::Terminal;
 use clap::Parser;
 use std::path::PathBuf;
 
@@ -18,11 +17,8 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-    Editor::new(&args.file, args.bytes_per_line)
+    Editor::init(&args.file, args.bytes_per_line)
         .expect("Failed to initialize editor")
         .run()
         .expect("Failed to run editor");
-
-    Terminal::terminate().unwrap();
-    println!("\r");
 }

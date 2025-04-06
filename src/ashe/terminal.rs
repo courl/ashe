@@ -39,6 +39,14 @@ impl Terminal {
         Ok(())
     }
 
+    pub fn set_foreground_color(color: crossterm::style::Color) -> Result<(), std::io::Error> {
+        queue!(stdout(), crossterm::style::SetForegroundColor(color))
+    }
+
+    pub fn set_background_color(color: crossterm::style::Color) -> Result<(), std::io::Error> {
+        queue!(stdout(), crossterm::style::SetBackgroundColor(color))
+    }
+
     pub fn clear_screen() -> Result<(), std::io::Error> {
         queue!(stdout(), Clear(ClearType::All))?;
         Ok(())
