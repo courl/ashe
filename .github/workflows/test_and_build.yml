@@ -3,8 +3,8 @@ on: [ push ]
 name: CI
 
 jobs:
-  test_and_build:
-    name: Rust project
+  test:
+    name: Ashe Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -14,6 +14,14 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: test
+  build:
+    name: Ashe Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
       - uses: actions-rs/cargo@v1
         with:
           command: build
