@@ -158,7 +158,7 @@ impl Editor {
 
     fn process_command(&mut self, value: &str) {
         match value {
-            "exit" | "q" | "x" => {
+            "exit" | "quit" | "q" | "x" => {
                 if self.buffer.is_dirty() {
                     self.warning = "Modified Buffer".into();
                 } else {
@@ -290,5 +290,165 @@ impl Editor {
 
         Terminal::execute()?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    fn setup_test_editor() -> Editor {
+        // Helper function to initialize an Editor for testing.
+        Editor {
+            cursor: 0,
+            bytes_per_line: 16,
+            offset: 0,
+            path: PathBuf::from("test.txt"),
+            buffer: Buffer::new([0xa, 0xb, 0xc].repeat(100)),
+            mode: EditorMode::Edit(None),
+            warning: String::new(),
+            should_exit: false,
+        }
+    }
+
+    #[test]
+    fn test_editor_initialization_with_bad_file() {
+        let path = Path::new("invalid_file.txt");
+        let bytes_per_line = 16;
+
+        // File at path does not exist
+        let editor = Editor::init(path, bytes_per_line);
+        assert!(editor.is_err());
+    }
+
+    #[test]
+    fn test_editor_update_cursor() {
+        let mut editor = setup_test_editor();
+        editor.update_cursor(5);
+        assert_eq!(editor.cursor, 5);
+        editor.update_cursor(-2);
+        assert_eq!(editor.cursor, 3);
+        editor.update_cursor(340);
+        assert_eq!(editor.cursor, 299);
+        editor.update_cursor(-1000);
+        assert_eq!(editor.cursor, 0);
+    }
+    #[test]
+    fn test_process_edit_event() {
+        let mut editor = setup_test_editor();
+        assert_eq!(editor.buffer[editor.cursor as usize], 0xa);
+        let event = KeyEvent::new(Char('2'), KeyModifiers::NONE);
+        let input_buffer = None;
+        let new_mode = editor.process_edit_event(&input_buffer, event, 16);
+        assert!(matches!(new_mode, Some(EditorMode::Edit(Some(2)))));
+        assert_eq!(editor.buffer[editor.cursor as usize], 0x02);
+
+        let event = KeyEvent::new(Char('1'), KeyModifiers::NONE);
+        let input_buffer = Some(0x2);
+        let new_mode = editor.process_edit_event(&input_buffer, event, 16);
+        assert!(matches!(new_mode, Some(EditorMode::Edit(None))));
+        assert_eq!(editor.buffer[editor.cursor as usize], 0x21);
+    }
+
+    #[test]
+    fn test_process_command_event() {
+        let mut editor = setup_test_editor();
+        let command = String::from("abc");
+        let event = KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE);
+        let new_mode = editor.process_command_event(&command, event);
+        assert!(matches!(new_mode, Some(EditorMode::Command(_))));
+        assert_eq!(
+            match new_mode {
+                Some(EditorMode::Command(value)) => value,
+                _ => "".into(),
+            },
+            "ab"
+        );
+
+        editor.buffer.update(0, 0x12);
+        assert!(editor.buffer.is_dirty());
+
+        let command = String::from("w");
+        let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
+        editor.process_command_event(&command, event);
+        assert!(!editor.buffer.is_dirty());
+
+        let command = String::from("q");
+        let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
+        editor.process_command_event(&command, event);
+        assert!(editor.should_exit);
+
+        editor.buffer.update(0, 0x12);
+        assert!(editor.buffer.is_dirty());
+
+        let command = String::from("wq");
+        let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
+        editor.process_command_event(&command, event);
+        assert!(!editor.buffer.is_dirty());
+        assert!(editor.should_exit);
+    }
+
+    #[test]
+    fn test_process_command() {
+        let mut editor = setup_test_editor();
+        let command = "exit";
+
+        editor.process_command(command);
+        assert!(editor.should_exit);
+
+        let mut editor = setup_test_editor();
+        editor.buffer.update(0, 0x12);
+        assert!(editor.buffer.is_dirty());
+        editor.process_command(command);
+        assert!(!editor.should_exit);
+        assert!(!editor.warning.is_empty());
+
+        let command = "wq";
+        assert!(editor.buffer.is_dirty());
+        editor.process_command(command);
+        assert!(editor.should_exit);
+    }
+
+    #[test]
+    fn test_process_cursor_update() {
+        let mut editor = setup_test_editor();
+        let max_lines = 10;
+
+        let event = KeyEvent::new(KeyCode::Left, KeyModifiers::NONE);
+        assert_eq!(editor.process_cursor_update(event, max_lines), -1);
+        let event = KeyEvent::new(KeyCode::Right, KeyModifiers::NONE);
+        assert_eq!(editor.process_cursor_update(event, max_lines), 1);
+        let event = KeyEvent::new(KeyCode::Down, KeyModifiers::NONE);
+        assert_eq!(
+            editor.process_cursor_update(event, max_lines),
+            editor.bytes_per_line as i64
+        );
+        let event = KeyEvent::new(KeyCode::Up, KeyModifiers::NONE);
+        assert_eq!(
+            editor.process_cursor_update(event, max_lines),
+            -(editor.bytes_per_line as i64)
+        );
+
+        let event = KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL);
+        assert_eq!(
+            editor.process_cursor_update(event, max_lines),
+            -(max_lines as i64)
+        );
+        let event = KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL);
+        assert_eq!(
+            editor.process_cursor_update(event, max_lines),
+            max_lines as i64
+        );
+        let event = KeyEvent::new(KeyCode::Down, KeyModifiers::CONTROL);
+        assert_eq!(
+            editor.process_cursor_update(event, max_lines),
+            editor.bytes_per_line as i64 * max_lines as i64
+        );
+        let event = KeyEvent::new(KeyCode::Up, KeyModifiers::CONTROL);
+        assert_eq!(
+            editor.process_cursor_update(event, max_lines),
+            -(editor.bytes_per_line as i64 * max_lines as i64)
+        );
     }
 }
